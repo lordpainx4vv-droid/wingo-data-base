@@ -25,7 +25,7 @@ if (!SOURCE_API_URL) {
 
 
 // ============================================
-// AUTO FETCH FROM SOURCE API (BYPASSING 403)
+// AUTO FETCH USING FREE PROXY (Bypassing 403)
 // ============================================
 
 async function fetchSourceData() {
@@ -33,15 +33,13 @@ async function fetchSourceData() {
     throw new Error("SOURCE_API_URL is not configured");
   }
 
-  // এখানে আমরা এমন কিছু ব্রাউজার হেডার দিচ্ছি যাতে লটারি সার্ভার রেন্ডারকে ব্লক না করে
-  const response = await fetch(SOURCE_API_URL, {
+  // ক্লাউড আইপি ব্লক এড়ানোর জন্য আমরা ফ্রি পাবলিক প্রক্সি রুট ব্যবহার করছি
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(SOURCE_API_URL)}`;
+
+  const response = await fetch(proxyUrl, {
     method: "GET",
     headers: {
-      "Accept": "application/json, text/plain, */*",
-      "Accept-Language": "en-US,en;q=0.9",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Referer": "https://ar-lottery01.com/",
-      "Origin": "https://ar-lottery01.com"
+      "Accept": "application/json, text/plain, */*"
     }
   });
 
@@ -132,7 +130,7 @@ async function collectData() {
   collecting = true;
 
   try {
-    console.log(`[${new Date().toISOString()}] Automatically checking source API...`);
+    console.log(`[${new Date().toISOString()}] Automatically checking source API via Proxy...`);
 
     const apiData = await fetchSourceData();
     const list = extractList(apiData);
@@ -173,10 +171,7 @@ async function collectData() {
 function startCollector() {
   console.log(`Automatic Background Collector started. Interval: ${POLL_INTERVAL}ms`);
   
-  // সার্ভার স্টার্ট হওয়ার সাথে সাথে একবার চলবে
   collectData();
-
-  // এরপর প্রতি ৩১ সেকেন্ড পর পর অটো চলতে থাকবে
   setInterval(collectData, POLL_INTERVAL);
 }
 
@@ -188,7 +183,7 @@ function startCollector() {
 app.get("/", (req, res) => {
   res.json({
     status: "online",
-    service: "Render Auto Firestore Collector",
+    service: "Render Auto Proxy Collector",
     collectorInterval: "31 seconds",
     firestore: "connected",
     time: new Date().toISOString()
@@ -248,7 +243,7 @@ app.get("/api/latest", async (req, res) => {
 
 app.use((req, res) => {
   res.status(404).json({ success: false, message: "Endpoint not found" });
-} );
+});
 
 
 // ============================================
@@ -257,5 +252,5 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  startCollector(); // সার্ভার চালু হওয়ার সাথে সাথে অটো কালেকশন অন হয়ে যাবে
+  startCollector();
 });
