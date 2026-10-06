@@ -1,19 +1,19 @@
-const {
-  initializeApp,
-  cert
-} = require("firebase-admin/app");
+const admin = require("firebase-admin");
 
-const {
-  getFirestore
-} = require("firebase-admin/firestore");
+let serviceAccount;
 
-// লোকাল ফাইল থেকে সরাসরি সার্ভিস একাউন্ট কি লোড করা হচ্ছে
-const serviceAccount = require('./serviceAccountKey.json');
+if (process.env.FIREBASE_CONFIG_JSON) {
+  // যদি Render এনভায়রনমেন্ট ভ্যারিয়েবল থেকে দেয়
+  serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG_JSON);
+} else {
+  // যদি লোকাল কম্পিউটারে থাকেন
+  serviceAccount = require("./serviceAccountKey.json");
+}
 
-initializeApp({
-  credential: cert(serviceAccount)
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
 });
 
-const db = getFirestore();
+const db = admin.firestore();
 
 module.exports = db;
