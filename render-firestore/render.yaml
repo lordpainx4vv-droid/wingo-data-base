@@ -1,0 +1,25 @@
+services:
+
+  - type: web
+    name: firestore-auto-saver
+    runtime: node
+
+    buildCommand: npm install
+
+    startCommand: npm start
+
+    plan: starter
+
+    envVars:
+
+      - key: NODE_VERSION
+        value: "22"
+
+      - key: FIRESTORE_COLLECTION
+        value: "results"
+
+      - key: SOURCE_API_URL
+        sync: false
+
+      - key: FIREBASE_SERVICE_ACCOUNT
+        sync: false
