@@ -7,23 +7,8 @@ const {
   getFirestore
 } = require("firebase-admin/firestore");
 
-if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-  throw new Error(
-    "FIREBASE_SERVICE_ACCOUNT environment variable is missing"
-  );
-}
-
-let serviceAccount;
-
-try {
-  serviceAccount = JSON.parse(
-    process.env.FIREBASE_SERVICE_ACCOUNT
-  );
-} catch (error) {
-  throw new Error(
-    "FIREBASE_SERVICE_ACCOUNT contains invalid JSON"
-  );
-}
+// লোকাল ফাইল থেকে সরাসরি সার্ভিস একাউন্ট কি লোড করা হচ্ছে
+const serviceAccount = require('./serviceAccountKey.json');
 
 initializeApp({
   credential: cert(serviceAccount)
