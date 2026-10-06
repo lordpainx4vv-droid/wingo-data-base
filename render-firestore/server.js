@@ -11,91 +11,14 @@ const PORT = process.env.PORT || 10000;
 // CONFIG
 // ============================================
 
-const SOURCE_API_URL = process.env.SOURCE_API_URL;
-
-const POLL_INTERVAL = 31 * 1000;
-
-// Firestore collection
 const COLLECTION_NAME =
   process.env.FIRESTORE_COLLECTION || "results";
 
-// How many results API returns
 const DEFAULT_LIMIT = 100;
 
 
 // ============================================
-// BASIC CHECK
-// ============================================
-
-if (!SOURCE_API_URL) {
-  console.warn(
-    "WARNING: SOURCE_API_URL is not configured."
-  );
-}
-
-
-// ============================================
-// FETCH SOURCE API (Updated with Browser Headers)
-// ============================================
-
-async function fetchSourceData() {
-
-  if (!SOURCE_API_URL) {
-    throw new Error(
-      "SOURCE_API_URL is not configured"
-    );
-  }
-
-  const response = await fetch(SOURCE_API_URL, {
-    method: "GET",
-    headers: {
-      "Accept": "application/json, text/plain, */*",
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-      "Referer": "https://ar-lottery01.com/"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `Source API returned HTTP ${response.status}`
-    );
-  }
-
-  return await response.json();
-}
-
-
-// ============================================
-// NORMALIZE SOURCE DATA
-// ============================================
-
-function extractList(apiData) {
-
-  if (Array.isArray(apiData)) {
-    return apiData;
-  }
-
-  if (
-    apiData &&
-    apiData.data &&
-    Array.isArray(apiData.data.list)
-  ) {
-    return apiData.data.list;
-  }
-
-  if (
-    apiData &&
-    Array.isArray(apiData.list)
-  ) {
-    return apiData.list;
-  }
-
-  return [];
-}
-
-
-// ============================================
-// SAVE ONE RESULT
+// SAVE ONE RESULT (Core Logic)
 // ============================================
 
 async function saveResult(item) {
@@ -170,115 +93,13 @@ async function saveResult(item) {
 
 
 // ============================================
-// COLLECT DATA
-// ============================================
-
-let collecting = false;
-
-async function collectData() {
-
-  if (collecting) {
-    console.log(
-      "Previous collection is still running. Skipping."
-    );
-    return;
-  }
-
-  collecting = true;
-
-  try {
-
-    console.log(
-      `[${new Date().toISOString()}] Checking source API...`
-    );
-
-    const apiData =
-      await fetchSourceData();
-
-    const list =
-      extractList(apiData);
-
-    if (!list.length) {
-      console.log(
-        "No result list found."
-      );
-      return;
-    }
-
-    let savedCount = 0;
-    let duplicateCount = 0;
-
-    for (const item of list) {
-
-      try {
-
-        const result =
-          await saveResult(item);
-
-        if (result.saved) {
-          savedCount++;
-          console.log(
-            `NEW: ${result.issueNumber}`
-          );
-        } else if (result.duplicate) {
-          duplicateCount++;
-        }
-
-      } catch (error) {
-        console.error(
-          "Save error:",
-          error.message
-        );
-      }
-    }
-
-    console.log(
-      `Collection finished | ` +
-      `received=${list.length} ` +
-      `saved=${savedCount} ` +
-      `duplicates=${duplicateCount}`
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Collector error:",
-      error.message
-    );
-
-  } finally {
-    collecting = false;
-  }
-}
-
-
-// ============================================
-// START COLLECTOR
-// ============================================
-
-function startCollector() {
-  console.log(
-    `Collector started. Interval: ${POLL_INTERVAL}ms`
-  );
-
-  collectData();
-
-  setInterval(
-    collectData,
-    POLL_INTERVAL
-  );
-}
-
-
-// ============================================
 // HEALTH API
 // ============================================
 
 app.get("/", (req, res) => {
   res.json({
     status: "online",
-    service: "Render Firestore Collector",
-    collectorInterval: "31 seconds",
+    service: "Render Firestore Collector (Client-Sync)",
     firestore: "connected",
     time: new Date().toISOString()
   });
@@ -286,16 +107,25 @@ app.get("/", (req, res) => {
 
 
 // ============================================
-// MANUAL COLLECT
+// RECEIVE DATA FROM FRONTEND (POST ROUTE)
 // ============================================
 
-app.get("/collect", async (req, res) => {
-  await collectData();
-  res.json({
-    success: true,
-    message: "Collection triggered",
-    time: new Date().toISOString()
-  });
+app.post("/api/save-result", async (req, res) => {
+  try {
+    const item = req.body;
+    const result = await saveResult(item);
+    
+    res.json({
+      success: true,
+      result
+    });
+  } catch (error) {
+    console.error("Save error:", error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 
@@ -398,52 +228,6 @@ app.get("/api/latest", async (req, res) => {
 
 
 // ============================================
-// GET SPECIFIC ISSUE
-// ============================================
-
-app.get(
-  "/api/results/:issueNumber",
-  async (req, res) => {
-
-    try {
-      const issue =
-        String(
-          req.params.issueNumber
-        ).trim();
-
-      const doc =
-        await db
-          .collection(COLLECTION_NAME)
-          .doc(issue)
-          .get();
-
-      if (!doc.exists) {
-        return res.status(404).json({
-          success: false,
-          message: "Result not found"
-        });
-      }
-
-      res.json({
-        success: true,
-        result: {
-          id: doc.id,
-          ...doc.data()
-        }
-      });
-
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message
-      });
-    }
-
-  }
-);
-
-
-// ============================================
 // 404
 // ============================================
 
@@ -463,6 +247,4 @@ app.listen(PORT, () => {
   console.log(
     `Server running on port ${PORT}`
   );
-
-  startCollector();
 });
